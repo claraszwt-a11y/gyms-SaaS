@@ -2,7 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/Sidebar";
 import { Card } from "@/components/Card";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { RegistrarPagamentoForm } from "@/components/RegistrarPagamentoForm";
 import { RegistrarCheckinForm } from "@/components/RegistrarCheckinForm";
 
@@ -62,6 +63,54 @@ export default async function AlunoPage({ params }: Props) {
     notFound();
   }
 
+  async function renovarMensalidade() {
+    "use server";
+
+    const alunoAtual = await prisma.aluno.findUnique({
+      where: {
+        id: Number(id),
+      },
+    });
+
+    if (!alunoAtual) {
+      return;
+    }
+
+    const hoje = new Date();
+
+    const novoVencimento = new Date(
+      alunoAtual.vencimento && alunoAtual.vencimento > hoje
+        ? alunoAtual.vencimento
+        : hoje
+    );
+
+    novoVencimento.setDate(novoVencimento.getDate() + 30);
+
+    await prisma.pagamento.create({
+      data: {
+        alunoId: alunoAtual.id,
+        valor: 89.9,
+        status: "Pago",
+      },
+    });
+
+    await prisma.aluno.update({
+      where: {
+        id: alunoAtual.id,
+      },
+      data: {
+        vencimento: novoVencimento,
+      },
+    });
+
+    revalidatePath(`/alunos/${id}`);
+    revalidatePath("/alunos");
+    revalidatePath("/dashboard");
+    revalidatePath("/financeiro");
+
+    redirect(`/alunos/${id}`);
+  }
+
   const vencido = estaVencido(aluno.vencimento);
 
   const pagamentosPagos = aluno.pagamentos.filter(
@@ -112,12 +161,20 @@ export default async function AlunoPage({ params }: Props) {
                 </div>
               </div>
 
-              <Link
-                href={`/alunos/${aluno.id}/editar`}
-                className="rounded-full bg-white px-6 py-3 text-center font-semibold text-black hover:bg-zinc-200"
-              >
-                Editar aluno
-              </Link>
+              <div className="flex flex-col gap-3">
+                <Link
+                  href={`/alunos/${aluno.id}/editar`}
+                  className="rounded-full bg-white px-6 py-3 text-center font-semibold text-black hover:bg-zinc-200"
+                >
+                  Editar aluno
+                </Link>
+
+                <form action={renovarMensalidade}>
+                  <button className="w-full rounded-full bg-green-500 px-6 py-3 text-center font-semibold text-white hover:bg-green-600">
+                    Renovar mensalidade
+                  </button>
+                </form>
+              </div>
             </div>
 
             <div className="mt-8 grid gap-5 md:grid-cols-3">
