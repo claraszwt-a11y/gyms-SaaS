@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  ResponsiveContainer,
   BarChart,
   Bar,
   XAxis,
@@ -23,18 +22,16 @@ export default function DashboardCharts() {
         Crescimento da academia
       </h2>
 
-      <div className="h-72">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <XAxis dataKey="nome" />
-            <Tooltip />
-           <Bar
-  dataKey="alunos"
-  fill="#22c55e"
-  radius={[10, 10, 0, 0]}
-/>
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="w-full overflow-x-auto">
+        <BarChart width={760} height={288} data={data}>
+          <XAxis dataKey="nome" />
+          <Tooltip />
+          <Bar
+            dataKey="alunos"
+            fill="#22c55e"
+            radius={[10, 10, 0, 0]}
+          />
+        </BarChart>
       </div>
     </div>
   );
