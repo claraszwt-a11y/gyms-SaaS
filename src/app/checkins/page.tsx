@@ -18,20 +18,42 @@ export default async function CheckinsPage() {
     },
   });
 
-  async function fazerCheckin(formData: FormData) {
-    "use server";
+ async function fazerCheckin(formData: FormData) {
+  "use server";
 
-    const alunoId = Number(formData.get("alunoId"));
+  const alunoId = Number(formData.get("alunoId"));
 
-    await prisma.checkin.create({
-      data: {
-        alunoId,
-      },
-    });
+  const aluno = await prisma.aluno.findUnique({
+    where: {
+      id: alunoId,
+    },
+  });
 
-    revalidatePath("/checkins");
+  if (!aluno) {
+    return;
   }
 
+  if (aluno.vencimento) {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+    const vencimento = new Date(aluno.vencimento);
+    vencimento.setHours(0, 0, 0, 0);
+
+    if (vencimento < hoje) {
+      return;
+    }
+  }
+
+  await prisma.checkin.create({
+    data: {
+      alunoId,
+    },
+  });
+
+  revalidatePath("/checkins");
+  revalidatePath(`/alunos/${alunoId}`);
+}
   return (
     <main className="min-h-screen bg-[#050505] text-white">
       <div className="flex min-h-screen">
