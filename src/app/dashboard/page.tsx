@@ -5,8 +5,36 @@ import { Card } from "../../components/Card";
 import { calcularDashboard } from "@/services/dashboard.service";
 import DashboardCharts from "@/components/DashboardCharts";
 
+function gerarDadosGrafico(alunos: { createdAt: Date }[]) {
+  const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+  const hoje = new Date();
+
+  return Array.from({ length: 6 }).map((_, index) => {
+    const dataBase = new Date(hoje.getFullYear(), hoje.getMonth() - 5 + index, 1);
+
+    const mes = dataBase.getMonth();
+    const ano = dataBase.getFullYear();
+
+    const alunosDoMes = alunos.filter((aluno) => {
+      const dataAluno = new Date(aluno.createdAt);
+
+      return dataAluno.getMonth() === mes && dataAluno.getFullYear() === ano;
+    }).length;
+
+    return {
+      nome: meses[mes],
+      alunos: alunosDoMes,
+    };
+  });
+}
+
 export default async function DashboardPage() {
-  const alunos = await prisma.aluno.findMany();
+  const alunos = await prisma.aluno.findMany({
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
 
   const {
     totalAlunos,
@@ -15,6 +43,8 @@ export default async function DashboardPage() {
     alunosPremium,
     receitaPrevista,
   } = calcularDashboard(alunos);
+
+  const dadosGrafico = gerarDadosGrafico(alunos);
 
   const cards = [
     ["Total de alunos", totalAlunos.toString(), "Alunos cadastrados"],
@@ -29,12 +59,7 @@ export default async function DashboardPage() {
       "Baseada nos alunos ativos",
     ],
   ];
-  [
-  "Alunos Premium",
-  alunosPremium.toString(),
-  "Plano mais vendido",
-]
-  
+
   return (
     <main className="min-h-screen bg-[#050505] text-white">
       <div className="flex min-h-screen">
@@ -72,7 +97,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="mt-8">
-            <DashboardCharts />
+            <DashboardCharts data={dadosGrafico} />
           </div>
 
           <div className="mt-8 grid gap-5 lg:grid-cols-3">
@@ -95,45 +120,29 @@ export default async function DashboardPage() {
 
               <div className="mt-8 grid gap-4 md:grid-cols-3">
                 <div className="rounded-2xl bg-black/30 p-5">
-                  <p className="text-sm text-zinc-500">
-                    Plano Premium
-                  </p>
-
-                  <p className="mt-3 text-3xl font-bold">
-                    {alunosPremium}
-                  </p>
+                  <p className="text-sm text-zinc-500">Plano Premium</p>
+                  <p className="mt-3 text-3xl font-bold">{alunosPremium}</p>
                 </div>
 
                 <div className="rounded-2xl bg-black/30 p-5">
-                  <p className="text-sm text-zinc-500">
-                    Taxa ativa
-                  </p>
+                  <p className="text-sm text-zinc-500">Taxa ativa</p>
 
                   <p className="mt-3 text-3xl font-bold">
                     {totalAlunos === 0
                       ? "0%"
-                      : `${Math.round(
-                          (alunosAtivos / totalAlunos) * 100
-                        )}%`}
+                      : `${Math.round((alunosAtivos / totalAlunos) * 100)}%`}
                   </p>
                 </div>
 
                 <div className="rounded-2xl bg-black/30 p-5">
-                  <p className="text-sm text-zinc-500">
-                    Atenção financeira
-                  </p>
-
-                  <p className="mt-3 text-3xl font-bold">
-                    {alunosVencidos}
-                  </p>
+                  <p className="text-sm text-zinc-500">Atenção financeira</p>
+                  <p className="mt-3 text-3xl font-bold">{alunosVencidos}</p>
                 </div>
               </div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-              <h3 className="text-xl font-bold">
-                Alertas inteligentes
-              </h3>
+              <h3 className="text-xl font-bold">Alertas inteligentes</h3>
 
               <p className="mt-1 text-sm text-zinc-500">
                 Pontos que precisam de atenção
@@ -145,9 +154,7 @@ export default async function DashboardPage() {
                     {alunosVencidos} alunos vencidos
                   </p>
 
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Financeiro
-                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">Financeiro</p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -155,9 +162,7 @@ export default async function DashboardPage() {
                     {alunosAtivos} alunos ativos
                   </p>
 
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Operação
-                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">Operação</p>
                 </div>
 
                 <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -169,9 +174,7 @@ export default async function DashboardPage() {
                     })}
                   </p>
 
-                  <p className="mt-1 text-xs text-zinc-500">
-                    Previsão mensal
-                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">Previsão mensal</p>
                 </div>
               </div>
             </div>

@@ -2,41 +2,59 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import toast from "react-hot-toast";
+
+type Aluno = {
+  id: number;
+  nome: string;
+  email: string;
+  telefone: string | null;
+  plano: string;
+};
 
 interface Props {
-  aluno: any;
+  aluno: Aluno;
 }
 
-export default function EditarAlunoForm({
-  aluno,
-}: Props) {
+export default function EditarAlunoForm({ aluno }: Props) {
   const router = useRouter();
 
   const [nome, setNome] = useState(aluno.nome);
   const [email, setEmail] = useState(aluno.email);
-  const [telefone, setTelefone] = useState(
-    aluno.telefone
-  );
+  const [telefone, setTelefone] = useState(aluno.telefone ?? "");
   const [plano, setPlano] = useState(aluno.plano);
+  const [carregando, setCarregando] = useState(false);
 
   async function salvar() {
-    await fetch(`/api/alunos/${aluno.id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        nome,
-        email,
-        telefone,
-        plano,
-      }),
-    });
+    try {
+      setCarregando(true);
 
-    alert("Aluno atualizado!");
+      const resposta = await fetch(`/api/alunos/${aluno.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nome,
+          email,
+          telefone,
+          plano,
+        }),
+      });
 
-    router.push("/alunos");
-    router.refresh();
+      if (!resposta.ok) {
+        throw new Error("Erro ao atualizar aluno");
+      }
+
+      toast.success("Aluno atualizado com sucesso!");
+
+      router.push("/alunos");
+      router.refresh();
+    } catch {
+      toast.error("Não foi possível atualizar o aluno.");
+    } finally {
+      setCarregando(false);
+    }
   }
 
   async function excluir() {
@@ -46,56 +64,58 @@ export default function EditarAlunoForm({
 
     if (!confirmar) return;
 
-    await fetch(`/api/alunos/${aluno.id}`, {
-      method: "DELETE",
-    });
+    try {
+      setCarregando(true);
 
-    alert("Aluno excluído!");
+      const resposta = await fetch(`/api/alunos/${aluno.id}`, {
+        method: "DELETE",
+      });
 
-    router.push("/alunos");
-    router.refresh();
+      if (!resposta.ok) {
+        throw new Error("Erro ao excluir aluno");
+      }
+
+      toast.success("Aluno excluído com sucesso!");
+
+      router.push("/alunos");
+      router.refresh();
+    } catch {
+      toast.error("Não foi possível excluir o aluno.");
+    } finally {
+      setCarregando(false);
+    }
   }
 
   return (
-    <main className="min-h-screen bg-[#050505] text-white p-8">
-      <div className="max-w-3xl mx-auto">
-        <h1 className="text-5xl font-bold mb-8">
-          Editar aluno
-        </h1>
+    <main className="min-h-screen bg-[#050505] p-8 text-white">
+      <div className="mx-auto max-w-3xl">
+        <h1 className="mb-8 text-5xl font-bold">Editar aluno</h1>
 
         <div className="space-y-4">
           <input
             type="text"
             value={nome}
-            onChange={(e) =>
-              setNome(e.target.value)
-            }
+            onChange={(e) => setNome(e.target.value)}
             className="w-full rounded-xl bg-zinc-900 p-4"
           />
 
           <input
             type="email"
             value={email}
-            onChange={(e) =>
-              setEmail(e.target.value)
-            }
+            onChange={(e) => setEmail(e.target.value)}
             className="w-full rounded-xl bg-zinc-900 p-4"
           />
 
           <input
             type="text"
             value={telefone}
-            onChange={(e) =>
-              setTelefone(e.target.value)
-            }
+            onChange={(e) => setTelefone(e.target.value)}
             className="w-full rounded-xl bg-zinc-900 p-4"
           />
 
           <select
             value={plano}
-            onChange={(e) =>
-              setPlano(e.target.value)
-            }
+            onChange={(e) => setPlano(e.target.value)}
             className="w-full rounded-xl bg-zinc-900 p-4"
           >
             <option>Premium</option>
@@ -106,16 +126,18 @@ export default function EditarAlunoForm({
           <div className="flex gap-3">
             <button
               onClick={salvar}
-              className="rounded-xl bg-white px-6 py-3 font-semibold text-black"
+              disabled={carregando}
+              className="rounded-xl bg-white px-6 py-3 font-semibold text-black disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Salvar alterações
+              {carregando ? "Salvando..." : "Salvar alterações"}
             </button>
 
             <button
               onClick={excluir}
-              className="rounded-xl bg-red-500/20 px-6 py-3 font-semibold text-red-400"
+              disabled={carregando}
+              className="rounded-xl bg-red-500/20 px-6 py-3 font-semibold text-red-400 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Excluir aluno
+              {carregando ? "Aguarde..." : "Excluir aluno"}
             </button>
           </div>
         </div>
