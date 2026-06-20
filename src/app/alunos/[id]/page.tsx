@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
 import { Sidebar } from "@/components/Sidebar";
 import { Card } from "@/components/Card";
@@ -15,8 +16,14 @@ interface Props {
 
 function formatarData(data: Date | null) {
   if (!data) return "Sem vencimento";
-
   return new Intl.DateTimeFormat("pt-BR").format(new Date(data));
+}
+
+function formatarDataHora(data: Date) {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(data));
 }
 
 function formatarMoeda(valor: number) {
@@ -63,6 +70,22 @@ export default async function AlunoPage({ params }: Props) {
     notFound();
   }
 
+  const ranking = await prisma.aluno.findMany({
+    include: {
+      _count: {
+        select: {
+          checkins: true,
+        },
+      },
+    },
+    orderBy: {
+      checkins: {
+        _count: "desc",
+      },
+    },
+    take: 5,
+  });
+
   async function renovarMensalidade() {
     "use server";
 
@@ -72,9 +95,7 @@ export default async function AlunoPage({ params }: Props) {
       },
     });
 
-    if (!alunoAtual) {
-      return;
-    }
+    if (!alunoAtual) return;
 
     const hoje = new Date();
 
@@ -127,6 +148,41 @@ export default async function AlunoPage({ params }: Props) {
     .filter((pagamento) => pagamento.status === "Pago")
     .reduce((total, pagamento) => total + pagamento.valor, 0);
 
+  const telefoneLimpo = aluno.telefone?.replace(/\D/g, "");
+
+  const mensagemWhatsApp = encodeURIComponent(
+    `Olá ${aluno.nome}! Tudo bem? Aqui é da GYMS Premium. Sua mensalidade está com vencimento em ${formatarData(
+      aluno.vencimento
+    )}.`
+  );
+
+  const timeline = [
+    {
+      id: `cadastro-${aluno.id}`,
+      icone: "👤",
+      titulo: "Aluno cadastrado",
+      descricao: `Plano ${aluno.plano}`,
+      data: aluno.createdAt,
+    },
+    ...aluno.pagamentos.map((pagamento) => ({
+      id: `pagamento-${pagamento.id}`,
+      icone: pagamento.status === "Pago" ? "💰" : "⚠️",
+      titulo:
+        pagamento.status === "Pago"
+          ? `Pagamento recebido: ${formatarMoeda(pagamento.valor)}`
+          : `Pagamento pendente: ${formatarMoeda(pagamento.valor)}`,
+      descricao: `Status: ${pagamento.status}`,
+      data: pagamento.createdAt,
+    })),
+    ...aluno.checkins.map((checkin) => ({
+      id: `checkin-${checkin.id}`,
+      icone: "✅",
+      titulo: "Check-in realizado",
+      descricao: "Presença registrada na academia",
+      data: checkin.createdAt,
+    })),
+  ].sort((a, b) => b.data.getTime() - a.data.getTime());
+
   return (
     <main className="min-h-screen bg-[#050505] text-white">
       <div className="flex min-h-screen">
@@ -134,67 +190,97 @@ export default async function AlunoPage({ params }: Props) {
 
         <section className="flex-1 p-6 pb-28 md:p-10">
           <div className="mx-auto max-w-7xl">
-            <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-              <div>
-                <p className="text-sm text-zinc-500">Perfil do aluno</p>
+            <div className="rounded-3xl border border-lime-400/20 bg-gradient-to-br from-lime-400/10 via-white/[0.03] to-white/[0.02] p-6 shadow-2xl shadow-lime-500/5">
+              <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-6 md:flex-row md:items-center">
+                  <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border border-lime-400/30 bg-lime-400/10 text-5xl font-black text-lime-400">
+                    {aluno.foto ? (
+                      <Image
+                        src={aluno.foto}
+                        alt={aluno.nome}
+                        width={112}
+                        height={112}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      aluno.nome.charAt(0).toUpperCase()
+                    )}
+                  </div>
 
-                <h1 className="mt-2 text-4xl font-bold">{aluno.nome}</h1>
+                  <div>
+                    <p className="text-sm text-zinc-500">Perfil premium</p>
 
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <span
-                    className={`rounded-full px-4 py-2 text-sm ${
-                      vencido
-                        ? "bg-red-500/20 text-red-400"
-                        : "bg-green-500/20 text-green-400"
-                    }`}
-                  >
-                    {vencido ? "Vencido" : "Ativo"}
-                  </span>
+                    <h1 className="mt-2 text-4xl font-bold md:text-5xl">
+                      {aluno.nome}
+                    </h1>
 
-                  <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-400">
-                    {aluno.plano}
-                  </span>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <span
+                        className={`rounded-full px-4 py-2 text-sm ${
+                          vencido
+                            ? "bg-red-500/20 text-red-400"
+                            : "bg-green-500/20 text-green-400"
+                        }`}
+                      >
+                        {vencido ? "Vencido" : "Ativo"}
+                      </span>
 
-                  <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-400">
-                    Vencimento: {formatarData(aluno.vencimento)}
-                  </span>
+                      <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-400">
+                        Plano {aluno.plano}
+                      </span>
+
+                      <span className="rounded-full border border-white/10 px-4 py-2 text-sm text-zinc-400">
+                        Vencimento: {formatarData(aluno.vencimento)}
+                      </span>
+                    </div>
+
+                    <div className="mt-6 grid gap-3 md:grid-cols-3">
+                      <div className="rounded-2xl bg-black/30 p-4">
+                        <p className="text-xs text-zinc-500">Email</p>
+                        <p className="mt-1 font-medium">{aluno.email}</p>
+                      </div>
+
+                      <div className="rounded-2xl bg-black/30 p-4">
+                        <p className="text-xs text-zinc-500">Telefone</p>
+                        <p className="mt-1 font-medium">
+                          {aluno.telefone || "Não informado"}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl bg-black/30 p-4">
+                        <p className="text-xs text-zinc-500">Membro desde</p>
+                        <p className="mt-1 font-medium">
+                          {formatarData(aluno.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex flex-col gap-3">
-                <Link
-                  href={`/alunos/${aluno.id}/editar`}
-                  className="rounded-full bg-white px-6 py-3 text-center font-semibold text-black hover:bg-zinc-200"
-                >
-                  Editar aluno
-                </Link>
+                <div className="flex flex-col gap-3">
+                  <Link
+                    href={`/alunos/${aluno.id}/editar`}
+                    className="rounded-full bg-white px-6 py-3 text-center font-semibold text-black hover:bg-zinc-200"
+                  >
+                    Editar aluno
+                  </Link>
 
-                <form action={renovarMensalidade}>
-                  <button className="w-full rounded-full bg-green-500 px-6 py-3 text-center font-semibold text-white hover:bg-green-600">
-                    Renovar mensalidade
-                  </button>
-                </form>
-              </div>
-            </div>
+                  {telefoneLimpo && (
+                    <a
+                      href={`https://wa.me/55${telefoneLimpo}?text=${mensagemWhatsApp}`}
+                      target="_blank"
+                      className="rounded-full bg-lime-500 px-6 py-3 text-center font-semibold text-black hover:bg-lime-400"
+                    >
+                      Cobrar no WhatsApp
+                    </a>
+                  )}
 
-            <div className="mt-8 grid gap-5 md:grid-cols-3">
-              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-                <p className="text-sm text-zinc-500">Email</p>
-                <p className="mt-3 font-medium">{aluno.email}</p>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-                <p className="text-sm text-zinc-500">Telefone</p>
-                <p className="mt-3 font-medium">
-                  {aluno.telefone || "Não informado"}
-                </p>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-                <p className="text-sm text-zinc-500">Cadastrado em</p>
-                <p className="mt-3 font-medium">
-                  {formatarData(aluno.createdAt)}
-                </p>
+                  <form action={renovarMensalidade}>
+                    <button className="w-full rounded-full bg-green-500 px-6 py-3 text-center font-semibold text-white hover:bg-green-600">
+                      Renovar mensalidade
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
 
@@ -227,6 +313,103 @@ export default async function AlunoPage({ params }: Props) {
             <div className="mt-10 grid gap-5 lg:grid-cols-2">
               <RegistrarPagamentoForm alunoId={aluno.id} />
               <RegistrarCheckinForm alunoId={aluno.id} />
+            </div>
+
+            <div className="mt-10 grid gap-8 lg:grid-cols-2">
+              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+                <h2 className="mb-6 text-xl font-bold">Timeline do aluno</h2>
+
+                <div className="space-y-4">
+                  {timeline.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-4 rounded-2xl border border-white/10 bg-black/30 p-4"
+                    >
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-lime-400/10 text-xl">
+                        {item.icone}
+                      </div>
+
+                      <div className="flex-1">
+                        <p className="font-medium">{item.titulo}</p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {item.descricao}
+                        </p>
+                      </div>
+
+                      <span className="text-xs text-zinc-500">
+                        {formatarDataHora(item.data)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+                <h2 className="text-xl font-bold">Observações internas</h2>
+
+                <p className="mt-4 text-zinc-400">
+                  {aluno.observacoes ||
+                    "Nenhuma observação cadastrada para este aluno."}
+                </p>
+
+                <div className="mt-8 rounded-3xl border border-white/10 bg-black/30 p-6">
+                  <h2 className="text-xl font-bold">Resumo rápido</h2>
+
+                  <p className="mt-3 text-zinc-400">
+                    Último check-in:{" "}
+                    {ultimoCheckin
+                      ? new Date(ultimoCheckin).toLocaleString("pt-BR")
+                      : "Nenhum check-in registrado"}
+                  </p>
+
+                  <p className="mt-3 text-zinc-400">
+                    Receita gerada: {formatarMoeda(receitaGerada)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 grid gap-8 lg:grid-cols-2">
+              <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+                <h2 className="text-xl font-bold">🏆 Ranking da academia</h2>
+
+                <p className="mt-1 text-sm text-zinc-500">
+                  Alunos mais frequentes
+                </p>
+
+                <div className="mt-6 space-y-3">
+                  {ranking.map((alunoRanking, index) => (
+                    <div
+                      key={alunoRanking.id}
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/30 p-4"
+                    >
+                      <div>
+                        <p className="font-semibold">
+                          #{index + 1} {alunoRanking.nome}
+                        </p>
+
+                        <p className="text-xs text-zinc-500">Frequência</p>
+                      </div>
+
+                      <p className="text-xl font-bold text-lime-400">
+                        {alunoRanking._count.checkins}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-lime-400/20 bg-lime-400/5 p-6">
+                <h2 className="text-xl font-bold text-lime-400">
+                  Destaque da academia
+                </h2>
+
+                <p className="mt-4 text-zinc-300">
+                  {ranking[0]
+                    ? `${ranking[0].nome} lidera com ${ranking[0]._count.checkins} check-ins.`
+                    : "Ainda não há check-ins registrados."}
+                </p>
+              </div>
             </div>
 
             <div className="mt-10 grid gap-8 lg:grid-cols-2">
@@ -295,17 +478,6 @@ export default async function AlunoPage({ params }: Props) {
                   )}
                 </div>
               </div>
-            </div>
-
-            <div className="mt-8 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-              <h2 className="text-xl font-bold">Resumo rápido</h2>
-
-              <p className="mt-3 text-zinc-400">
-                Último check-in:{" "}
-                {ultimoCheckin
-                  ? new Date(ultimoCheckin).toLocaleString("pt-BR")
-                  : "Nenhum check-in registrado"}
-              </p>
             </div>
           </div>
         </section>

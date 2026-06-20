@@ -8,17 +8,21 @@ datasource db {
 }
 
 model Aluno {
-  id          Int          @id @default(autoincrement())
-  nome        String
-  email       String       @unique
-  telefone    String?
-  plano       String
-  ativo       Boolean      @default(true)
-  vencimento  DateTime?
-  createdAt   DateTime     @default(now())
+  id           Int       @id @default(autoincrement())
+  nome         String
+  email        String    @unique
+  telefone     String?
+  plano        String
+  ativo        Boolean   @default(true)
 
-  pagamentos  Pagamento[]
-  checkins    Checkin[]
+  foto         String?
+  observacoes  String?
+
+  vencimento   DateTime?
+  createdAt    DateTime  @default(now())
+
+  pagamentos   Pagamento[]
+  checkins     Checkin[]
 }
 
 model Pagamento {
